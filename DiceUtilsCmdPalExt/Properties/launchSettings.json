@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "DiceUtilsCmdPalExt (Package)": {
+      "commandName": "MsixPackage",
+      "doNotLaunchApp": true
+    },
+    "DiceUtilsCmdPalExt (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
