@@ -2,9 +2,6 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
-using System;
-using System.Diagnostics;
-using System.Globalization;
 using DiceUtilsCmdPalExt.Commands;
 using DiceUtilsCmdPalExt.Pages;
 using DiceUtilsCmdPalExt.Util;
@@ -30,12 +27,10 @@ public partial class DiceUtilsCmdPalExtCommandsProvider : CommandProvider
 
         var rollCommand = new RollCommand();
         _distributionPage = new ResolveDiceRollDistributionPage();
-        var resolveCommand = new ResolveDiceRollCommand(_distributionPage);
-
         _fallbackCommands =
         [
             new FallbackCommandItem(rollCommand, "Roll dice", "diceutils.roll"),
-            new FallbackCommandItem(resolveCommand, "Resolve dice", "diceutils.resolve"),
+            new FallbackCommandItem(_distributionPage, "Resolve dice", "diceutils.resolve"),
         ];
     }
 
@@ -47,16 +42,5 @@ public partial class DiceUtilsCmdPalExtCommandsProvider : CommandProvider
     public override IFallbackCommandItem[] FallbackCommands()
     {
         return _fallbackCommands;
-    }
-
-    public override ICommand? GetCommand(string id)
-    {
-        Debug.WriteLine($"GetCommand(id={id})");
-        if (string.Equals(id, _distributionPage.Id, StringComparison.Ordinal))
-        {
-            return _distributionPage;
-        }
-
-        return null;
     }
 }

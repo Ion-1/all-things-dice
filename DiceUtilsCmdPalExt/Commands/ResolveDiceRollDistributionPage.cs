@@ -1,37 +1,101 @@
 using System;
-using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
+using DiceUtilsCmdPalExt.DiceLanguage;
 using DiceUtilsCmdPalExt.DiceLanguage.Eval;
+using DiceUtilsCmdPalExt.DiceLanguage.Parser;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 
 namespace DiceUtilsCmdPalExt.Commands;
 
-internal sealed partial class ResolveDiceRollDistributionPage : ContentPage
+internal sealed partial class ResolveDiceRollDistributionPage : ContentPage, IFallbackHandler
 {
     private string _expression = string.Empty;
-    private DiceDistribution _distribution = DiceDistribution.FromModifier(0);
+    private string? _validationError;
+
+    public static IconInfo DiceIcon = new IconInfo("🎲");
+    public static IconInfo WarningIcon = new IconInfo("⚠");
 
     public ResolveDiceRollDistributionPage()
     {
         Id = "custom-dice-dist-page";
-        Icon = ResolveDiceRollCommand.DiceIcon;
-        Name = "Resolve dice";
+        Icon = DiceIcon;
+        Name = string.Empty;
         Title = "Resolved dice";
     }
 
-    public void SetDistribution(string expression, DiceDistribution distribution)
+    public void UpdateQuery(string query)
     {
-        _expression = expression;
-        _distribution = distribution;
-        Title = $"Resolved {expression}";
+        _expression = string.Empty;
+        _validationError = null;
+        Icon = DiceIcon;
+        Title = "Resolved dice";
+
+        var parts = query.Split(
+            (char[]?)null,
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+        );
+
+        bool isResolveCommand =
+            parts.Length > 0
+            && new[] { "res", "resolve" }.Contains(parts[0], StringComparer.OrdinalIgnoreCase);
+
+        if (!isResolveCommand)
+        {
+            Name = string.Empty;
+            return;
+        }
+
+        if (parts.Length == 1)
+        {
+            Name = "Resolve dice";
+            return;
+        }
+
+        var expression = query[parts[0].Length..].Trim();
+        var validation = DiceRoller<DicePoolDistribution, DiceDistribution>.Validate(expression);
+
+        switch (validation)
+        {
+            case Success<Expr>:
+                _expression = expression;
+                Icon = DiceIcon;
+                Name = $"Resolve {expression}";
+                Title = $"Resolved {expression}";
+                break;
+
+            case Error<Expr> message:
+                _validationError = $"{message}";
+                Icon = WarningIcon;
+                Name = $"{message}";
+                break;
+        }
     }
 
     public override IContent[] GetContent()
     {
-        return [new MarkdownContent(BuildMarkdown(_expression, _distribution))];
+        if (!string.IsNullOrWhiteSpace(_validationError))
+        {
+            return [new MarkdownContent($"# Invalid dice expression\n\n{_validationError}")];
+        }
+
+        if (string.IsNullOrWhiteSpace(_expression))
+        {
+            return [new MarkdownContent("Enter a dice expression to resolve.")];
+        }
+
+        var result = DiceRoller<DicePoolDistribution, DiceDistribution>.Roll(_expression);
+
+        return result switch
+        {
+            Success<DiceDistribution>(var distribution) =>
+                [new MarkdownContent(BuildMarkdown(_expression, distribution))],
+            Error<DiceDistribution>(var message) =>
+                [new MarkdownContent($"Could not resolve `{_expression}` because {message}")],
+            _ => [],
+        };
     }
 
     private static string BuildMarkdown(string expression, DiceDistribution distribution)
