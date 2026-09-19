@@ -6,31 +6,22 @@ using Pidgin;
 
 namespace DiceUtilsCmdPalExt.DiceLanguage;
 
-public class RollResult
+public abstract record Result<T>;
+
+public record Success<T>(T Value) : Result<T>;
+
+public record Error<T>(string Message) : Result<T>;
+
+public static class DiceRoller<TPool, TResult>
+    where TResult : IDiceAbacus<TResult>
+    where TPool : TResult, IDicePoolAbacus<TPool, TResult>
 {
-    public bool IsSuccess { get; }
-    public int Value { get; }
-    public string Descriptor { get; }
+    private static readonly DiceEvaluator<TPool, TResult> _evaluator = new();
 
-    private RollResult(bool success, int value, string error)
-    {
-        IsSuccess = success;
-        Value = value;
-        Descriptor = error;
-    }
-
-    public static RollResult Success(int value, string descriptor) => new RollResult(true, value, descriptor);
-    public static RollResult Failure(string message) => new RollResult(false, 0, message);
-}
-
-public static class DiceRoller
-{
-    private static readonly DiceEvaluator<DicePool, DiceValue> _evaluator = new();
-
-    public static RollResult Roll(string input)
+    public static Result<TResult> Roll(string input)
     {
         if (string.IsNullOrWhiteSpace(input))
-            return RollResult.Failure("Input is empty.");
+            return new Error<TResult>("Input is empty.");
 
         IEnumerable<Token> tokens;
         try
@@ -38,13 +29,15 @@ public static class DiceRoller
             var parseResult = Tokenizer.Tokens.Parse(input);
             if (!parseResult.Success)
             {
-                return RollResult.Failure($"Tokenization error at {parseResult.Error.ErrorPos}: {parseResult.Error.Message}");
+                return new Error<TResult>(
+                    $"Tokenization error at {parseResult.Error.ErrorPos}: {parseResult.Error}"
+                );
             }
             tokens = parseResult.Value;
         }
         catch (Exception ex)
         {
-            return RollResult.Failure($"Unexpected error during tokenization: {ex.Message}");
+            return new Error<TResult>($"Unexpected error during tokenization: {ex.Message}");
         }
 
         Expr ast;
@@ -53,27 +46,70 @@ public static class DiceRoller
             var parseResult = LanguageParser.ExprParser.Parse(tokens);
             if (!parseResult.Success)
             {
-                return RollResult.Failure($"Parsing error at {parseResult.Error.ErrorPos}: {parseResult.Error.Message}");
+                return new Error<TResult>(
+                    $"Parsing error at {parseResult.Error.ErrorPos}: {parseResult.Error}"
+                );
             }
             ast = parseResult.Value;
         }
         catch (Exception ex)
         {
-            return RollResult.Failure($"Unexpected error during parsing: {ex.Message}");
+            return new Error<TResult>($"Unexpected error during parsing: {ex.Message}");
         }
 
         try
         {
             var result = _evaluator.Evaluate(ast);
-            return RollResult.Success(result.Value, result.Description);
+            return new Success<TResult>(result);
         }
         catch (EvaluationError evEx)
         {
-            return RollResult.Failure($"Evaluation error: {evEx.Message}");
+            return new Error<TResult>($"Evaluation error: {evEx.Message}");
         }
         catch (Exception ex)
         {
-            return RollResult.Failure($"Unexpected evaluation error: {ex.Message}");
+            return new Error<TResult>($"Unexpected evaluation error: {ex.Message}");
+        }
+    }
+
+    public static Result<Expr> Validate(string input)
+    {
+        IEnumerable<Token> tokens;
+
+        try
+        {
+            var tokenResult = Tokenizer.Tokens.Parse(input);
+
+            if (!tokenResult.Success)
+            {
+                return new Error<Expr>(
+                    $"Syntax error at {tokenResult.Error.ErrorPos}: " + tokenResult.Error
+                );
+            }
+
+            tokens = tokenResult.Value;
+        }
+        catch (Exception ex)
+        {
+            return new Error<Expr>($"Unexpected error during tokenization: {ex.Message}");
+        }
+
+        try
+        {
+            var parseResult = LanguageParser.ExprParser.Parse(tokens);
+
+            if (!parseResult.Success)
+            {
+                return new Error<Expr>(
+                    $"Parsing error at {parseResult.Error.ErrorPos}: " + parseResult.Error
+                );
+            }
+
+            return new Success<Expr>(parseResult.Value);
+        }
+        catch (Exception ex)
+        {
+            return new Error<Expr>($"Unexpected error during parsing: {ex.Message}");
         }
     }
 }

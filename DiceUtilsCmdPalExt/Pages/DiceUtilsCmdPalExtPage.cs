@@ -2,10 +2,11 @@
 // The Microsoft Corporation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using DiceUtilsCmdPalExt.Commands;
 using Microsoft.CommandPalette.Extensions;
 using Microsoft.CommandPalette.Extensions.Toolkit;
 
-namespace DiceUtilsCmdPalExt;
+namespace DiceUtilsCmdPalExt.Pages;
 
 internal sealed partial class DiceUtilsCmdPalExtPage : ListPage
 {
@@ -18,8 +19,13 @@ internal sealed partial class DiceUtilsCmdPalExtPage : ListPage
 
     public override IListItem[] GetItems()
     {
-        return [
-            new ListItem(new NoOpCommand()) { Title = "TODO: Implement your extension here" }
+        return
+        [
+            new ListItem(new RollCommand())
+            {
+                Title = "Roll dice",
+                Subtitle = "Roll a dice expression",
+            },
         ];
     }
 }

@@ -5,11 +5,11 @@ public enum TokenType
     Integer,
     AddOp,
     MulOp,
-    Pool, 
+    Pool,
     Keyword,
     OpenParen,
     CloseParen,
-    EOF
+    EOF,
 }
 
 public record Token(TokenType Type, string Value);

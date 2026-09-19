@@ -266,7 +266,7 @@ For an aggregate of count `N`, its `primary` operand is independently evaluated 
 ### Division
 
 ```text
-/   real-valued division
+/   round-to-nearest division (midpoint away from zero)
 //  integer division truncated toward zero
 ```
 

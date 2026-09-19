@@ -12,8 +12,11 @@ public interface IDiceAbacus<TSelf>
     static abstract TSelf FromModifier(int modifier);
 
     static abstract TSelf operator +(TSelf left, TSelf right);
+
     static abstract TSelf operator -(TSelf left, TSelf right);
+
     static abstract TSelf operator *(TSelf left, TSelf right);
+
     static abstract TSelf operator /(TSelf left, TSelf right);
 
     TSelf TruncatedDiv(TSelf other);
@@ -23,9 +26,7 @@ public interface IDicePoolAbacus<TSelf, TResult>
     where TSelf : TResult, IDicePoolAbacus<TSelf, TResult>
     where TResult : IDiceAbacus<TResult>
 {
-    static abstract TSelf Create(
-        int numberOfDice,
-        int numberOfFaces);
+    static abstract TSelf Create(int numberOfDice, int numberOfFaces);
 
     TSelf KeepHighest(int count);
     TSelf KeepLowest(int count);
@@ -37,7 +38,8 @@ public interface IDicePoolAbacus<TSelf, TResult>
 
 public class EvaluationError : Exception
 {
-    public EvaluationError(string message) : base(message) { }
+    public EvaluationError(string message)
+        : base(message) { }
 }
 
 public class DiceEvaluator<TPool, TResult>
@@ -48,27 +50,23 @@ public class DiceEvaluator<TPool, TResult>
     {
         return expr switch
         {
-            IntegerExpr(var value)
-                => TResult.FromModifier(value),
+            IntegerExpr(var value) => TResult.FromModifier(value),
 
-            BinaryOpExpr(var left, var op, var right)
-                => EvaluateBinaryOp(left, op, right),
+            BinaryOpExpr(var left, var op, var right) => EvaluateBinaryOp(left, op, right),
 
-            RollExpr(var count, var sides, var steps)
-                => EvaluateRoll(count, sides, steps),
+            RollExpr(var count, var sides, var steps) => EvaluateRoll(count, sides, steps),
 
-            AggregateExpr(var aggType, var count, var operand)
-                => EvaluateAggregate(aggType, count, operand),
+            AggregateExpr(var aggType, var count, var operand) => EvaluateAggregate(
+                aggType,
+                count,
+                operand
+            ),
 
-            _ => throw new EvaluationError(
-                $"Unknown expression type: {expr.GetType().Name}")
+            _ => throw new EvaluationError($"Unknown expression type: {expr.GetType().Name}"),
         };
     }
 
-    private TResult EvaluateBinaryOp(
-        Expr left,
-        string op,
-        Expr right)
+    private TResult EvaluateBinaryOp(Expr left, string op, Expr right)
     {
         TResult l = Evaluate(left);
         TResult r = Evaluate(right);
@@ -81,53 +79,38 @@ public class DiceEvaluator<TPool, TResult>
             "/" => l / r,
             "//" => l.TruncatedDiv(r),
 
-            _ => throw new EvaluationError(
-                $"Unknown operator: {op}")
+            _ => throw new EvaluationError($"Unknown operator: {op}"),
         };
     }
 
-    private TResult EvaluateAggregate(
-        string aggType,
-        int count,
-        Expr operand)
+    private TResult EvaluateAggregate(string aggType, int count, Expr operand)
     {
         if (count <= 0)
-            throw new EvaluationError(
-                "Aggregate count must be positive");
+            throw new EvaluationError("Aggregate count must be positive");
 
         TResult first = Evaluate(operand);
 
-        IEnumerable<TResult> results =
-            Enumerable.Range(1, count - 1)
-                .Select(_ => Evaluate(operand));
+        IEnumerable<TResult> results = Enumerable
+            .Range(1, count - 1)
+            .Select(_ => Evaluate(operand));
 
         return aggType switch
         {
-            "sum" => results.Aggregate(
-                first,
-                (acc, value) => acc + value),
+            "sum" => results.Aggregate(first, (acc, value) => acc + value),
 
-            "product" => results.Aggregate(
-                first,
-                (acc, value) => acc * value),
+            "product" => results.Aggregate(first, (acc, value) => acc * value),
 
-            _ => throw new EvaluationError(
-                $"Unknown aggregate type: {aggType}")
+            _ => throw new EvaluationError($"Unknown aggregate type: {aggType}"),
         };
     }
 
-    private TResult EvaluateRoll(
-        int diceCount,
-        int sides,
-        IReadOnlyList<RollStep> steps)
+    private TResult EvaluateRoll(int diceCount, int sides, IReadOnlyList<RollStep> steps)
     {
         if (diceCount < 0)
-            throw new EvaluationError(
-                "Dice count cannot be negative");
+            throw new EvaluationError("Dice count cannot be negative");
 
         if (sides <= 0)
-            throw new EvaluationError(
-                "Dice sides must be positive");
+            throw new EvaluationError("Dice sides must be positive");
 
         TPool pool = TPool.Create(diceCount, sides);
 
@@ -135,47 +118,34 @@ public class DiceEvaluator<TPool, TResult>
         {
             pool = step switch
             {
-                KeepStep(var selector, var count) =>
-                    selector switch
-                    {
-                        SelectorType.Highest
-                            => pool.KeepHighest(count),
+                KeepStep(var selector, var count) => selector switch
+                {
+                    SelectorType.Highest => pool.KeepHighest(count),
 
-                        SelectorType.Lowest
-                            => pool.KeepLowest(count),
+                    SelectorType.Lowest => pool.KeepLowest(count),
 
-                        _ => throw new EvaluationError(
-                            $"Unknown selector: {selector}")
-                    },
+                    _ => throw new EvaluationError($"Unknown selector: {selector}"),
+                },
 
-                DropStep(var selector, var count) =>
-                    selector switch
-                    {
-                        SelectorType.Highest
-                            => pool.DropHighest(count),
+                DropStep(var selector, var count) => selector switch
+                {
+                    SelectorType.Highest => pool.DropHighest(count),
 
-                        SelectorType.Lowest
-                            => pool.DropLowest(count),
+                    SelectorType.Lowest => pool.DropLowest(count),
 
-                        _ => throw new EvaluationError(
-                            $"Unknown selector: {selector}")
-                    },
+                    _ => throw new EvaluationError($"Unknown selector: {selector}"),
+                },
 
-                RerollStep(var selector, var count) =>
-                    selector switch
-                    {
-                        SelectorType.Highest
-                            => pool.RerollHighest(count),
+                RerollStep(var selector, var count) => selector switch
+                {
+                    SelectorType.Highest => pool.RerollHighest(count),
 
-                        SelectorType.Lowest
-                            => pool.RerollLowest(count),
+                    SelectorType.Lowest => pool.RerollLowest(count),
 
-                        _ => throw new EvaluationError(
-                            $"Unknown selector: {selector}")
-                    },
+                    _ => throw new EvaluationError($"Unknown selector: {selector}"),
+                },
 
-                _ => throw new EvaluationError(
-                    $"Unknown roll step type: {step.GetType().Name}")
+                _ => throw new EvaluationError($"Unknown roll step type: {step.GetType().Name}"),
             };
         }
 
